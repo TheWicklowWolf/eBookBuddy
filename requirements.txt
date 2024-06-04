@@ -1,0 +1,11 @@
+gunicorn
+gevent
+gevent-websocket
+flask
+flask_socketio
+requests
+thefuzz
+Unidecode
+selenium
+webdriver-manager
+PyVirtualDisplay
