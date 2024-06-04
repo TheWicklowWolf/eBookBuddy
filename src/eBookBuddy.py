@@ -239,6 +239,7 @@ class DataHandler:
 
             except Exception as e:
                 self.diagnostic_logger.error(f"Failure Scraping Goodreads: {str(e)}")
+                socketio.emit("new_toast_msg", {"title": "Search Failed", "message": "Check Logs...."})
 
             finally:
                 self.search_in_progress_flag = False
