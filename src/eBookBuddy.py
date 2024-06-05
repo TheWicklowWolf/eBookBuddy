@@ -224,6 +224,7 @@ class DataHandler:
                                         break
                                 else:
                                     self.raw_new_books.append(book_item)
+                                    self.similar_books.append(book_item)
                                     socketio.emit("more_books_loaded", [book_item])
                                     self.search_exhausted_flag = False
                                     new_book_count += 1
@@ -234,8 +235,6 @@ class DataHandler:
                 if self.search_exhausted_flag:
                     self.diagnostic_logger.info("Search Exhausted - Try selecting more books from existing Readarr library")
                     socketio.emit("new_toast_msg", {"title": "Search Exhausted", "message": "Try selecting more books from existing Readarr library"})
-                else:
-                    self.similar_books.extend(self.raw_new_books)
 
             except Exception as e:
                 self.diagnostic_logger.error(f"Failure Scraping Goodreads: {str(e)}")
