@@ -30,6 +30,14 @@ class DataHandler:
             os.makedirs(self.config_folder)
         self.load_environ_or_config_settings()
         self.goodreads_scraper = _scrapers.Goodreads_Scraper(self.diagnostic_logger, self.minimum_rating, self.minimum_votes, self.goodreads_wait_delay)
+        if self.auto_start:
+            try:
+                auto_start_thread = threading.Timer(self.auto_start_delay, self.automated_startup)
+                auto_start_thread.daemon = True
+                auto_start_thread.start()
+
+            except Exception as e:
+                self.diagnostic_logger.error(f"Auto Start Error: {str(e)}")
 
     def load_environ_or_config_settings(self):
         # Defaults
@@ -47,6 +55,8 @@ class DataHandler:
             "goodreads_wait_delay": 12.5,
             "readarr_wait_delay": 7.5,
             "thread_limit": 1,
+            "auto_start": False,
+            "auto_start_delay": 60,
         }
 
         # Load settings from environmental variables (which take precedence) over the configuration file.
@@ -72,6 +82,10 @@ class DataHandler:
         self.readarr_wait_delay = float(readarr_wait_delay) if readarr_wait_delay else ""
         thread_limit = os.environ.get("thread_limit", "")
         self.thread_limit = float(thread_limit) if thread_limit else ""
+        auto_start = os.environ.get("auto_start", "")
+        self.auto_start = auto_start.lower() == "true" if auto_start != "" else ""
+        auto_start_delay = os.environ.get("auto_start_delay", "")
+        self.auto_start_delay = float(auto_start_delay) if auto_start_delay else ""
 
         # Load variables from the configuration file if not set by environmental variables.
         try:
@@ -93,6 +107,11 @@ class DataHandler:
 
         # Save config.
         self.save_config_to_file()
+
+    def automated_startup(self):
+        self.request_books_from_readarr(checked=True)
+        items = [x["name"] for x in self.readarr_items]
+        self.start(items)
 
     def connection(self):
         if self.similar_books:
@@ -143,7 +162,7 @@ class DataHandler:
             thread.daemon = True
             thread.start()
 
-    def request_books_from_readarr(self):
+    def request_books_from_readarr(self, checked=False):
         try:
             self.diagnostic_logger.info(f"Getting Books from Readarr")
             self.readarr_books_in_library = []
@@ -175,7 +194,7 @@ class DataHandler:
                         cleaned_book = unidecode(book_author_and_title).lower()
                         self.cleaned_readarr_items.append(cleaned_book)
 
-            self.readarr_items = [{"name": f"{book['author']} - {book['title']}", "checked": False} for book in self.readarr_books_in_library]
+            self.readarr_items = [{"name": f"{book['author']} - {book['title']}", "checked": checked} for book in self.readarr_books_in_library]
 
             status = "Success"
             self.readarr_items = sorted(self.readarr_items, key=lambda x: x["name"])
@@ -416,6 +435,8 @@ class DataHandler:
                         "goodreads_wait_delay": self.goodreads_wait_delay,
                         "readarr_wait_delay": self.readarr_wait_delay,
                         "thread_limit": self.thread_limit,
+                        "auto_start": self.auto_start,
+                        "auto_start_delay": self.auto_start_delay,
                     },
                     json_file,
                     indent=4,

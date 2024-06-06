@@ -41,6 +41,9 @@ Certain values can be set via environment variables:
 * __goodreads_wait_delay__: Delay to allow for slow data retrieval from GoodReads. Defaults to `12.5`.
 * __readarr_wait_delay__: Delay to allow for slow data retrieval from GoodReads. Defaults to `7.5`.
 * __thread_limit__: Max number of concurrent threads to use for data retrieval. Defaults to `1`.
+* __auto_start__: Whether to run automatically at startup. Defaults to `False`.
+* __auto_start_delay__: Delay duration for Auto Start in Seconds (if enabled). Defaults to `60`.
+
 ---
 
 
