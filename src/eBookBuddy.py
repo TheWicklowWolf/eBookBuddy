@@ -293,14 +293,16 @@ class DataHandler:
                 status = "Added"
             else:
                 status = "Failed to Add"
-                self.diagnostic_logger.info(f"No Matching Book for: {book_author_and_title}.")
-                socketio.emit("new_toast_msg", {"title": "Failed to add Book", "message": f"No Matching Book for: {book_name} in Google Books."})
+                self.diagnostic_logger.info(f"Failed to add to Readarr as no matching book for: {book_author_and_title}.")
+                socketio.emit("new_toast_msg", {"title": "Failed to add Book", "message": f"No Matching Book for: {book_author_and_title}"})
 
             for item in self.similar_books:
                 if item["Name"] == book_name and item["Author"] == author_name:
                     item["Status"] = status
                     socketio.emit("refresh_book", item)
                     break
+            else:
+                self.diagnostic_logger.info(f"{item['Author']} - {item['Name']} not found in Similar Book List")
 
         except Exception as e:
             self.diagnostic_logger.error(f"Error Adding Book to Readarr: {str(e)}")
