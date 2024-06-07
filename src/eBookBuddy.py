@@ -81,7 +81,7 @@ class DataHandler:
         readarr_wait_delay = os.environ.get("readarr_wait_delay", "")
         self.readarr_wait_delay = float(readarr_wait_delay) if readarr_wait_delay else ""
         thread_limit = os.environ.get("thread_limit", "")
-        self.thread_limit = float(thread_limit) if thread_limit else ""
+        self.thread_limit = int(thread_limit) if thread_limit else ""
         auto_start = os.environ.get("auto_start", "")
         self.auto_start = auto_start.lower() == "true" if auto_start != "" else ""
         auto_start_delay = os.environ.get("auto_start_delay", "")
@@ -188,7 +188,7 @@ class DataHandler:
 
                 # Filter books with files
                 for book in books:
-                    if book.get("statistics", {}).get("bookFileCount") > 0:
+                    if book.get("statistics", {}).get("bookFileCount", 0) > 0:
                         self.readarr_books_in_library.append({"author": author_name, "title": book.get("title")})
                         book_author_and_title = f'{author_name} - {book.get("title")}'
                         cleaned_book = unidecode(book_author_and_title).lower()
@@ -202,7 +202,7 @@ class DataHandler:
             ret = {"Status": status, "Code": response_books.status_code if status == "Error" else None, "Data": self.readarr_items, "Running": not self.stop_event.is_set()}
 
         except Exception as e:
-            self.diagnostic_logger.error(f"Getting Book Error: {str(e)}")
+            self.diagnostic_logger.error(f"Error Getting Book list from Readarr: {str(e)}")
             ret = {"Status": "Error", "Code": 500, "Data": str(e), "Running": not self.stop_event.is_set()}
 
         finally:
