@@ -320,8 +320,15 @@ socket.on("disconnect", function () {
     clear_all();
 });
 
-let overview_request_flag = false;
+function clear_all() {
+    var book_row = document.getElementById('book-row');
+    var book_cards = book_row.querySelectorAll('#book-column');
+    book_cards.forEach(function (card) {
+        card.remove();
+    });
+}
 
+let overview_request_flag = false;
 function overview_req(book, overview_button) {
     if (!overview_request_flag) {
         overview_request_flag = true;
@@ -342,14 +349,6 @@ function load_more_books_req() {
             load_more_request_flag = false;
         }, 1000);
     }
-}
-
-function clear_all() {
-    var book_row = document.getElementById('book-row');
-    var book_cards = book_row.querySelectorAll('#book-column');
-    book_cards.forEach(function (card) {
-        card.remove();
-    });
 }
 
 function book_overview_modal(book) {
