@@ -21,7 +21,7 @@ class DataHandler:
         self.search_exhausted_flag = True
         self.clients_connected_counter = 0
         self.config_folder = "config"
-        self.similar_books = []
+        self.recommended_books = []
         self.readarr_items = []
         self.cleaned_readarr_items = []
         self.stop_event = threading.Event()
@@ -114,15 +114,14 @@ class DataHandler:
         self.start(items)
 
     def connection(self):
-        if self.similar_books:
+        if self.recommended_books:
             if self.clients_connected_counter == 0:
-                if len(self.similar_books) > 25:
-                    self.similar_books = random.sample(self.similar_books, 25)
+                if len(self.recommended_books) > 25:
+                    self.recommended_books = random.sample(self.recommended_books, 25)
                 else:
                     self.diagnostic_logger.info(f"Shuffling Books")
-                    random.shuffle(self.similar_books)
-                self.raw_new_books = []
-            socketio.emit("more_books_loaded", self.similar_books)
+                    random.shuffle(self.recommended_books)
+            socketio.emit("more_books_loaded", self.recommended_books)
 
         self.clients_connected_counter += 1
 
@@ -133,9 +132,8 @@ class DataHandler:
         try:
             socketio.emit("clear")
             self.search_exhausted_flag = False
-            self.raw_new_books = []
             self.books_to_use_in_search = []
-            self.similar_books = []
+            self.recommended_books = []
 
             for item in self.readarr_items:
                 item_name = item["name"]
@@ -237,13 +235,12 @@ class DataHandler:
                             book_author_and_title = f"{book_item['Author']} - {book_item['Name']}"
                             cleaned_book = unidecode(book_author_and_title).lower()
                             if cleaned_book not in self.cleaned_readarr_items:
-                                for item in self.raw_new_books:
+                                for item in self.recommended_books:
                                     match_ratio = fuzz.ratio(book_author_and_title, f"{item['Author']} - {item['Name']}")
                                     if match_ratio > 95:
                                         break
                                 else:
-                                    self.raw_new_books.append(book_item)
-                                    self.similar_books.append(book_item)
+                                    self.recommended_books.append(book_item)
                                     socketio.emit("more_books_loaded", [book_item])
                                     self.search_exhausted_flag = False
                                     new_book_count += 1
@@ -296,7 +293,7 @@ class DataHandler:
                 self.diagnostic_logger.info(f"Failed to add to Readarr as no matching book for: {book_author_and_title}.")
                 socketio.emit("new_toast_msg", {"title": "Failed to add Book", "message": f"No Matching Book for: {book_author_and_title}"})
 
-            for item in self.similar_books:
+            for item in self.recommended_books:
                 if item["Name"] == book_name and item["Author"] == author_name:
                     item["Status"] = status
                     socketio.emit("refresh_book", item)
