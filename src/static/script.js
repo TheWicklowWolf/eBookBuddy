@@ -308,11 +308,7 @@ socket.on('more_books_loaded', function (data) {
 });
 
 socket.on('clear', function () {
-    var book_row = document.getElementById('book-row');
-    var book_cards = book_row.querySelectorAll('#book-column');
-    book_cards.forEach(function (card) {
-        card.remove();
-    });
+    clear_all();
 });
 
 socket.on("new_toast_msg", function (data) {
@@ -320,7 +316,8 @@ socket.on("new_toast_msg", function (data) {
 });
 
 socket.on("disconnect", function () {
-    book_toast("Connection Lost", "Please reconnect to continue.");
+    book_toast("Connection Lost", "Please refresh to continue.");
+    clear_all();
 });
 
 let overview_request_flag = false;
@@ -345,6 +342,14 @@ function load_more_books_req() {
             load_more_request_flag = false;
         }, 1000);
     }
+}
+
+function clear_all() {
+    var book_row = document.getElementById('book-row');
+    var book_cards = book_row.querySelectorAll('#book-column');
+    book_cards.forEach(function (card) {
+        card.remove();
+    });
 }
 
 function book_overview_modal(book) {
