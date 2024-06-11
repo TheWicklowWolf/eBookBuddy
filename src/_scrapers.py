@@ -1,4 +1,3 @@
-import time
 import random
 import platform
 from urllib.parse import urlparse
@@ -14,10 +13,11 @@ from webdriver_manager.firefox import GeckoDriverManager
 
 
 class Goodreads_Scraper:
-    def __init__(self, logger, minimum_rating, minimum_votes, goodreads_wait_delay):
+    def __init__(self, logger, stop_event, minimum_rating, minimum_votes, goodreads_wait_delay):
         self.diagnostic_logger = logger
-        self.minimum_votes = minimum_votes
+        self.stop_event = stop_event
         self.minimum_rating = minimum_rating
+        self.minimum_votes = minimum_votes
         self.goodreads_wait_delay = goodreads_wait_delay
         self.user_agents = [
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36",
@@ -30,6 +30,7 @@ class Goodreads_Scraper:
         self.firexfox_options = webdriver.FirefoxOptions()
         self.firexfox_options.add_argument("--no-sandbox")
         self.firexfox_options.add_argument("--disable-dev-shm-usage")
+        self.firexfox_options.add_argument("--avoid-stats=true")
         self.firexfox_options.add_argument("--window-size=1280,768")
         if "linux" in platform.platform().lower():
             display = Display(backend="xvfb", visible=False, size=(1280, 768))
@@ -46,10 +47,14 @@ class Goodreads_Scraper:
             return webdriver.Firefox(options=firexfox_options)
 
     def goodreads_recommendations(self, query):
+        similar_books = []
+        book_link = None
+        driver = None
         try:
-            similar_books = []
-            book_link = None
             try:
+                if self.stop_event.is_set():
+                    self.diagnostic_logger.info("Stop request detected, exiting...")
+                    return []
                 self.diagnostic_logger.error(f"Creating New Driver...")
                 driver = self.get_firexfox_driver()
                 url = f"https://www.goodreads.com/search?q={query.replace(' ', '+')}"
@@ -62,18 +67,25 @@ class Goodreads_Scraper:
             try:
                 wait = WebDriverWait(driver, self.goodreads_wait_delay)
                 self.diagnostic_logger.info(f"Waiting to see if Overlay is displayed...")
-                overlay = wait.until(EC.visibility_of_element_located((By.CLASS_NAME, "Overlay__window")))
+                overlay = wait.until(lambda driver: self.stop_event.is_set() or EC.visibility_of_element_located((By.CLASS_NAME, "Overlay__window"))(driver))
+                if self.stop_event.is_set():
+                    self.diagnostic_logger.info("Stop request detected, exiting...")
+                    return []
 
             except Exception as e:
                 self.diagnostic_logger.info(f"No Overlay displayed, continuing...")
                 overlay = None
 
             try:
+                if self.stop_event.is_set():
+                    self.diagnostic_logger.info("Stop request detected, exiting...")
+                    return []
                 if overlay:
                     self.diagnostic_logger.info(f"Overlay displayed on search, attempting to close it...")
                     close_div = overlay.find_element(By.CLASS_NAME, "modal__close")
                     close_button = close_div.find_element(By.CSS_SELECTOR, "img[alt='Dismiss']")
                     close_button.click()
+
             except Exception as e:
                 self.diagnostic_logger.error(f"Failed to close overlay: {str(e)}")
                 self.diagnostic_logger.info(f"Trying to continue")
@@ -84,6 +96,9 @@ class Goodreads_Scraper:
                 search_results = table.find_elements(By.CSS_SELECTOR, "tr")
 
                 for result in search_results:
+                    if self.stop_event.is_set():
+                        self.diagnostic_logger.info("Stop request detected, exiting...")
+                        return []
                     item_title_element = result.find_element(By.CSS_SELECTOR, "span[itemprop='name']")
                     item_title = item_title_element.text.strip()
 
@@ -113,7 +128,11 @@ class Goodreads_Scraper:
                 try:
                     wait = WebDriverWait(driver, self.goodreads_wait_delay)
                     self.diagnostic_logger.info(f"Waiting to see if Overlay is displayed...")
-                    overlay = wait.until(EC.visibility_of_element_located((By.CLASS_NAME, "Overlay__window")))
+                    overlay = wait.until(lambda driver: self.stop_event.is_set() or EC.visibility_of_element_located((By.CLASS_NAME, "Overlay__window"))(driver))
+
+                    if self.stop_event.is_set():
+                        self.diagnostic_logger.info("Stop request detected, exiting...")
+                        return []
                 except Exception as e:
                     self.diagnostic_logger.info(f"No Overlay displayed, continuing...")
                     overlay = None
@@ -129,20 +148,29 @@ class Goodreads_Scraper:
                         self.diagnostic_logger.info(f"Attempting to Continue")
 
                 try:
+                    if self.stop_event.is_set():
+                        self.diagnostic_logger.info("Stop request detected, exiting...")
+                        return []
                     element = driver.find_element(By.CLASS_NAME, "BookPage__relatedTopContent")
                     driver.execute_script("arguments[0].scrollIntoView();", element)
                     wait = WebDriverWait(driver, self.goodreads_wait_delay)
                     self.diagnostic_logger.info(f"Waiting until Carousel is displayed...")
-                    carousel = wait.until(EC.visibility_of_element_located((By.CLASS_NAME, "Carousel")))
+                    carousel = wait.until(lambda driver: self.stop_event.is_set() or EC.visibility_of_element_located((By.CLASS_NAME, "Carousel"))(driver))
+
                 except:
                     try:
                         self.diagnostic_logger.info(f"Could not find Carousel on first attempt trying again...")
                         wait = WebDriverWait(driver, self.goodreads_wait_delay)
                         self.diagnostic_logger.info(f"Waiting until Carousel is displayed...")
-                        carousel = wait.until(EC.visibility_of_element_located((By.CLASS_NAME, "Carousel")))
+                        carousel = wait.until(lambda driver: self.stop_event.is_set() or EC.visibility_of_element_located((By.CLASS_NAME, "Carousel"))(driver))
+
                     except Exception as e:
                         self.diagnostic_logger.error(f"Failed to get book info: {str(e)}")
                         raise Exception("No Valid Carousel")
+
+                if self.stop_event.is_set():
+                    self.diagnostic_logger.info("Stop request detected, exiting...")
+                    return []
 
                 next_button = driver.find_element(By.CSS_SELECTOR, 'button[aria-label="Carousel, Next page"]')
                 book_cards = carousel.find_elements(By.CLASS_NAME, "BookCard")
@@ -152,6 +180,9 @@ class Goodreads_Scraper:
                     book_cards = carousel.find_elements(By.CLASS_NAME, "BookCard")
                     for card in book_cards[i : i + 4]:
                         try:
+                            if self.stop_event.is_set():
+                                self.diagnostic_logger.info("Stop request detected, exiting...")
+                                return []
                             title = card.find_element(By.CSS_SELECTOR, '[data-testid="title"]').text
                             author = card.find_element(By.CSS_SELECTOR, '[data-testid="author"]').text
                             rating = card.find_element(By.CLASS_NAME, "AverageRating__ratingValue").text
@@ -186,7 +217,7 @@ class Goodreads_Scraper:
                     if i + 4 < total_cards and next_button.is_enabled():
                         next_button.click()
                         self.diagnostic_logger.info(f"Checking Next Batch...")
-                        time.sleep(1)
+                        self.stop_event.wait(1)
 
             except Exception as e:
                 self.diagnostic_logger.error(f"Error extracting data: {str(e)}")
@@ -196,5 +227,6 @@ class Goodreads_Scraper:
 
         finally:
             self.diagnostic_logger.info(f"Discovered {len(similar_books)} potential books")
-            driver.quit()
+            if driver:
+                driver.quit()
             return similar_books

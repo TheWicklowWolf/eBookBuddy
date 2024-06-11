@@ -29,7 +29,7 @@ class DataHandler:
         if not os.path.exists(self.config_folder):
             os.makedirs(self.config_folder)
         self.load_environ_or_config_settings()
-        self.goodreads_scraper = _scrapers.Goodreads_Scraper(self.diagnostic_logger, self.minimum_rating, self.minimum_votes, self.goodreads_wait_delay)
+        self.goodreads_scraper = _scrapers.Goodreads_Scraper(self.diagnostic_logger, self.stop_event, self.minimum_rating, self.minimum_votes, self.goodreads_wait_delay)
         if self.auto_start:
             try:
                 auto_start_thread = threading.Timer(self.auto_start_delay, self.automated_startup)
@@ -219,7 +219,7 @@ class DataHandler:
 
                 self.search_exhausted_flag = True
                 self.search_in_progress_flag = True
-                minimum_count = self.thread_limit if self.thread_limit > 1 and self.thread_limit < 8 else 4
+                minimum_count = self.thread_limit if self.thread_limit > 1 and self.thread_limit < 16 else 6
                 sample_count = min(minimum_count, len(self.books_to_use_in_search))
                 random_books = random.sample(self.books_to_use_in_search, sample_count)
                 with concurrent.futures.ThreadPoolExecutor(max_workers=self.thread_limit) as executor:
@@ -227,6 +227,10 @@ class DataHandler:
                     for future in concurrent.futures.as_completed(futures):
                         related_books = future.result()
                         new_book_count = 0
+                        if self.stop_event.is_set():
+                            for f in futures:
+                                f.cancel()
+                            break
                         for book_item in related_books:
                             if self.stop_event.is_set():
                                 for f in futures:
@@ -248,7 +252,7 @@ class DataHandler:
                     if new_book_count > 0:
                         self.diagnostic_logger.info(f"Found {new_book_count} new suggestions that are not already in Readarr")
 
-                if self.search_exhausted_flag:
+                if self.search_exhausted_flag and not self.stop_event.is_set():
                     self.diagnostic_logger.info("Search Exhausted - Try selecting more books from existing Readarr library")
                     socketio.emit("new_toast_msg", {"title": "Search Exhausted", "message": "Try selecting more books from existing Readarr library"})
 
@@ -265,7 +269,7 @@ class DataHandler:
                 self.search_in_progress_flag = True
                 self.diagnostic_logger.info("Search Exhausted - Try selecting more books from existing Readarr library")
                 socketio.emit("new_toast_msg", {"title": "Search Exhausted", "message": "Try selecting more books from existing Readarr library"})
-                time.sleep(2)
+                self.stop_event.wait(2)
 
             except Exception as e:
                 self.diagnostic_logger.error(f"Search Exhausted Error: {str(e)}")
