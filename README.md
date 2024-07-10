@@ -6,7 +6,7 @@
 <img src="/src/static/ebookbuddy.png" alt="image">
 
 
-Web GUI for finding similar books to selected Readarr books.
+Book discovery tool that provides recommendations based on selected Readarr books. 
 
 
 ## Run using docker-compose
