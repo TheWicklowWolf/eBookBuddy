@@ -17,6 +17,13 @@ class DataHandler:
     def __init__(self):
         logging.basicConfig(level=logging.INFO, format="%(message)s")
         self.diagnostic_logger = logging.getLogger()
+
+        app_name_text = os.path.basename(__file__).replace(".py", "")
+        release_version = os.environ.get("RELEASE_VERSION", "unknown")
+        self.diagnostic_logger.warning(f"{'*' * 50}\n")
+        self.diagnostic_logger.warning(f"{app_name_text} Version: {release_version}\n")
+        self.diagnostic_logger.warning(f"{'*' * 50}")
+
         self.search_in_progress_flag = False
         self.search_exhausted_flag = True
         self.clients_connected_counter = 0
