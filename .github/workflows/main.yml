@@ -76,8 +76,6 @@ jobs:
           flavor: |
             latest=auto
           tags: |
-            type=edge,branch=main
-            type=edge,branch=master
             type=semver,pattern={{version}},value=${{ needs.bump-version-and-create-release-tag.outputs.new_version }}
 
       - name: Login to GitHub Container Registry
