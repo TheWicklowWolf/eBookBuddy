@@ -4,7 +4,7 @@ FROM python:3.12-alpine
 # Set build arguments
 ARG RELEASE_VERSION
 ENV RELEASE_VERSION=${RELEASE_VERSION}
-ENV EBB_PORT=5000
+ENV EBB_PORT=${EBB_PORT:-5000}
 
 # Create User
 ARG UID=1000
@@ -27,10 +27,17 @@ RUN apk --no-cache add \
     fontconfig \
     dbus
 
+ARG TARGETARCH
+RUN echo "TARGETARCH: ${TARGETARCH}"
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
+    echo "Installing geckodriver for arm64"; \
+    apk --no-cache add geckodriver; \
+    fi
+
 # Install requirements and run code
-RUN pip install --root-user-action=ignore --no-cache-dir --upgrade pip
-RUN pip install --root-user-action=ignore --no-cache-dir -r requirements.txt
-ENV PYTHONPATH "${PYTHONPATH}:/ebookbuddy/src"
+RUN pip install --root-user-action=ignore --no-cache-dir --upgrade pip && \
+    pip install --root-user-action=ignore --no-cache-dir -r requirements.txt
+ENV PYTHONPATH="${PYTHONPATH}:/ebookbuddy/src"
 EXPOSE ${EBB_PORT}
 USER general_user
 CMD exec gunicorn src.eBookBuddy:app -b 0.0.0.0:${EBB_PORT} -c gunicorn_config.py
