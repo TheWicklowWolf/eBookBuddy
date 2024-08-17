@@ -1,11 +1,8 @@
 version: 2
 updates:
-  - package-ecosystem: "docker"
-    directory: "/" 
-    schedule:
-      interval: "weekly"
-  - package-ecosystem: "pip"
+  - package-ecosystem: "github-actions"
+    # Workflow files stored in the default location of `.github/workflows`
     directory: "/"
     schedule:
-      interval: daily
-      time: "13:00"
+      interval: "daily"
+    open-pull-requests-limit: 10
