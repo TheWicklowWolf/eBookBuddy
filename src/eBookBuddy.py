@@ -1,15 +1,17 @@
+import concurrent.futures
 import json
-import time
 import logging
 import os
 import random
 import threading
-import concurrent.futures
+import time
+
+import requests
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO
-import requests
 from thefuzz import fuzz
 from unidecode import unidecode
+
 import _scrapers
 
 
@@ -36,15 +38,23 @@ class DataHandler:
         if not os.path.exists(self.config_folder):
             os.makedirs(self.config_folder)
         self.load_environ_or_config_settings()
-        self.goodreads_scraper = _scrapers.Goodreads_Scraper(self.diagnostic_logger, self.stop_event, self.minimum_rating, self.minimum_votes, self.goodreads_wait_delay)
+        self.goodreads_scraper = _scrapers.Goodreads_Scraper(
+            self.diagnostic_logger,
+            self.stop_event,
+            self.minimum_rating,
+            self.minimum_votes,
+            self.goodreads_wait_delay,
+        )
         if self.auto_start:
             try:
-                auto_start_thread = threading.Timer(self.auto_start_delay, self.automated_startup)
+                auto_start_thread = threading.Timer(
+                    self.auto_start_delay, self.automated_startup,
+                )
                 auto_start_thread.daemon = True
                 auto_start_thread.start()
 
-            except Exception as e:
-                self.diagnostic_logger.error(f"Auto Start Error: {str(e)}")
+            except Exception:
+                self.diagnostic_logger.exception("Auto Start Error")
 
     def load_environ_or_config_settings(self):
         # Defaults
@@ -72,21 +82,33 @@ class DataHandler:
         self.root_folder_path = os.environ.get("root_folder_path", "")
         self.google_books_api_key = os.environ.get("google_books_api_key", "")
         readarr_api_timeout = os.environ.get("readarr_api_timeout", "")
-        self.readarr_api_timeout = float(readarr_api_timeout) if readarr_api_timeout else ""
+        self.readarr_api_timeout = (
+            float(readarr_api_timeout) if readarr_api_timeout else ""
+        )
         quality_profile_id = os.environ.get("quality_profile_id", "")
         self.quality_profile_id = int(quality_profile_id) if quality_profile_id else ""
         metadata_profile_id = os.environ.get("metadata_profile_id", "")
-        self.metadata_profile_id = int(metadata_profile_id) if metadata_profile_id else ""
+        self.metadata_profile_id = (
+            int(metadata_profile_id) if metadata_profile_id else ""
+        )
         search_for_missing_book = os.environ.get("search_for_missing_book", "")
-        self.search_for_missing_book = search_for_missing_book.lower() == "true" if search_for_missing_book != "" else ""
+        self.search_for_missing_book = (
+            search_for_missing_book.lower() == "true"
+            if search_for_missing_book != ""
+            else ""
+        )
         minimum_rating = os.environ.get("minimum_rating", "")
         self.minimum_rating = float(minimum_rating) if minimum_rating else ""
         minimum_votes = os.environ.get("minimum_votes", "")
         self.minimum_votes = int(minimum_votes) if minimum_votes else ""
         goodreads_wait_delay = os.environ.get("goodreads_wait_delay", "")
-        self.goodreads_wait_delay = float(goodreads_wait_delay) if goodreads_wait_delay else ""
+        self.goodreads_wait_delay = (
+            float(goodreads_wait_delay) if goodreads_wait_delay else ""
+        )
         readarr_wait_delay = os.environ.get("readarr_wait_delay", "")
-        self.readarr_wait_delay = float(readarr_wait_delay) if readarr_wait_delay else ""
+        self.readarr_wait_delay = (
+            float(readarr_wait_delay) if readarr_wait_delay else ""
+        )
         thread_limit = os.environ.get("thread_limit", "")
         self.thread_limit = int(thread_limit) if thread_limit else ""
         auto_start = os.environ.get("auto_start", "")
@@ -96,7 +118,9 @@ class DataHandler:
 
         # Load variables from the configuration file if not set by environmental variables.
         try:
-            self.settings_config_file = os.path.join(self.config_folder, "settings_config.json")
+            self.settings_config_file = os.path.join(
+                self.config_folder, "settings_config.json"
+            )
             if os.path.exists(self.settings_config_file):
                 self.diagnostic_logger.info(f"Loading Config via file")
                 with open(self.settings_config_file, "r") as json_file:
@@ -104,8 +128,8 @@ class DataHandler:
                     for key in ret:
                         if getattr(self, key) == "":
                             setattr(self, key, ret[key])
-        except Exception as e:
-            self.diagnostic_logger.error(f"Error Loading Config: {str(e)}")
+        except Exception:
+            self.diagnostic_logger.exception("Error Loading Config")
 
         # Load defaults if not set by an environmental variable or configuration file.
         for key, value in default_settings.items():
@@ -157,13 +181,20 @@ class DataHandler:
                 raise Exception("No Readarr Books Selected")
 
         except Exception as e:
-            self.diagnostic_logger.error(f"Startup Error: {str(e)}")
+            self.diagnostic_logger.exception("Startup Error")
             self.stop_event.set()
-            ret = {"Status": "Error", "Code": str(e), "Data": self.readarr_items, "Running": not self.stop_event.is_set()}
+            ret = {
+                "Status": "Error",
+                "Code": f"{e.__class__.__qualname__}: {e}",
+                "Data": self.readarr_items,
+                "Running": not self.stop_event.is_set(),
+            }
             socketio.emit("readarr_sidebar_update", ret)
 
         else:
-            thread = threading.Thread(target=data_handler.find_similar_books, name="Start_Finding_Thread")
+            thread = threading.Thread(
+                target=data_handler.find_similar_books, name="Start_Finding_Thread"
+            )
             thread.daemon = True
             thread.start()
 
@@ -173,9 +204,13 @@ class DataHandler:
             self.readarr_books_in_library = []
             endpoint_authors = f"{self.readarr_address}/api/v1/author"
             headers = {"Accept": "application/json", "X-Api-Key": self.readarr_api_key}
-            response_authors = requests.get(endpoint_authors, headers=headers, timeout=self.readarr_api_timeout)
+            response_authors = requests.get(
+                endpoint_authors, headers=headers, timeout=self.readarr_api_timeout,
+            )
             if response_authors.status_code != 200:
-                raise Exception(f"Failed to fetch authors from Readarr: {response_authors.text}")
+                raise Exception(
+                    f"Failed to fetch authors from Readarr: {response_authors.text}"
+                )
 
             authors = response_authors.json()
 
@@ -184,31 +219,52 @@ class DataHandler:
                 author_name = author["authorName"]
 
                 # Fetch books by author from Readarr
-                endpoint_books = f"{self.readarr_address}/api/v1/book?authorId={author_id}"
-                response_books = requests.get(endpoint_books, headers=headers, timeout=self.readarr_api_timeout)
+                endpoint_books = (
+                    f"{self.readarr_address}/api/v1/book?authorId={author_id}"
+                )
+                response_books = requests.get(
+                    endpoint_books, headers=headers, timeout=self.readarr_api_timeout
+                )
                 if response_books.status_code != 200:
-                    raise Exception(f"Failed to fetch books by author '{author_name}' from Readarr: {response_books.text}")
+                    raise Exception(
+                        f"Failed to fetch books by author '{author_name}' from Readarr: {response_books.text}"
+                    )
 
                 books = response_books.json()
 
                 # Filter books with files
                 for book in books:
                     if book.get("statistics", {}).get("bookFileCount", 0) > 0:
-                        self.readarr_books_in_library.append({"author": author_name, "title": book.get("title")})
+                        self.readarr_books_in_library.append(
+                            {"author": author_name, "title": book.get("title")}
+                        )
                         book_author_and_title = f'{author_name} - {book.get("title")}'
                         cleaned_book = unidecode(book_author_and_title).lower()
                         self.cleaned_readarr_items.append(cleaned_book)
 
-            self.readarr_items = [{"name": f"{book['author']} - {book['title']}", "checked": checked} for book in self.readarr_books_in_library]
+            self.readarr_items = [
+                {"name": f"{book['author']} - {book['title']}", "checked": checked}
+                for book in self.readarr_books_in_library
+            ]
 
             status = "Success"
             self.readarr_items = sorted(self.readarr_items, key=lambda x: x["name"])
 
-            ret = {"Status": status, "Code": response_books.status_code if status == "Error" else None, "Data": self.readarr_items, "Running": not self.stop_event.is_set()}
+            ret = {
+                "Status": status,
+                "Code": response_books.status_code if status == "Error" else None,
+                "Data": self.readarr_items,
+                "Running": not self.stop_event.is_set(),
+            }
 
         except Exception as e:
-            self.diagnostic_logger.error(f"Error Getting Book list from Readarr: {str(e)}")
-            ret = {"Status": "Error", "Code": 500, "Data": str(e), "Running": not self.stop_event.is_set()}
+            self.diagnostic_logger.exception("Error Getting Book list from Readarr")
+            ret = {
+                "Status": "Error",
+                "Code": 500,
+                "Data": f"{e.__class__.__qualname__}: {e}",
+                "Running": not self.stop_event.is_set(),
+            }
 
         finally:
             socketio.emit("readarr_sidebar_update", ret)
@@ -217,20 +273,40 @@ class DataHandler:
         if self.stop_event.is_set() or self.search_in_progress_flag:
             if self.search_in_progress_flag:
                 self.diagnostic_logger.info(f"Searching already in progress")
-                socketio.emit("new_toast_msg", {"title": "Search in progress", "message": f"It's just slow...."})
+                socketio.emit(
+                    "new_toast_msg",
+                    {"title": "Search in progress", "message": f"It's just slow...."},
+                )
             return
         elif not self.search_exhausted_flag:
             try:
                 self.diagnostic_logger.info(f"Searching for new books")
-                socketio.emit("new_toast_msg", {"title": "Searching for new books", "message": f"Please be patient...."})
+                socketio.emit(
+                    "new_toast_msg",
+                    {
+                        "title": "Searching for new books",
+                        "message": f"Please be patient....",
+                    },
+                )
 
                 self.search_exhausted_flag = True
                 self.search_in_progress_flag = True
-                minimum_count = self.thread_limit if self.thread_limit > 1 and self.thread_limit < 16 else 6
+                minimum_count = (
+                    self.thread_limit
+                    if self.thread_limit > 1 and self.thread_limit < 16
+                    else 6
+                )
                 sample_count = min(minimum_count, len(self.books_to_use_in_search))
                 random_books = random.sample(self.books_to_use_in_search, sample_count)
-                with concurrent.futures.ThreadPoolExecutor(max_workers=self.thread_limit) as executor:
-                    futures = [executor.submit(self.goodreads_scraper.goodreads_recommendations, book_name) for book_name in random_books]
+                with concurrent.futures.ThreadPoolExecutor(
+                    max_workers=self.thread_limit,
+                ) as executor:
+                    futures = [
+                        executor.submit(
+                            self.goodreads_scraper.goodreads_recommendations, book_name
+                        )
+                        for book_name in random_books
+                    ]
                     for future in concurrent.futures.as_completed(futures):
                         related_books = future.result()
                         new_book_count = 0
@@ -243,11 +319,16 @@ class DataHandler:
                                 for f in futures:
                                     f.cancel()
                                 break
-                            book_author_and_title = f"{book_item['Author']} - {book_item['Name']}"
+                            book_author_and_title = (
+                                f"{book_item['Author']} - {book_item['Name']}"
+                            )
                             cleaned_book = unidecode(book_author_and_title).lower()
                             if cleaned_book not in self.cleaned_readarr_items:
                                 for item in self.recommended_books:
-                                    match_ratio = fuzz.ratio(book_author_and_title, f"{item['Author']} - {item['Name']}")
+                                    match_ratio = fuzz.ratio(
+                                        book_author_and_title,
+                                        f"{item['Author']} - {item['Name']}",
+                                    )
                                     if match_ratio > 95:
                                         break
                                 else:
@@ -257,15 +338,28 @@ class DataHandler:
                                     new_book_count += 1
 
                     if new_book_count > 0:
-                        self.diagnostic_logger.info(f"Found {new_book_count} new suggestions that are not already in Readarr")
+                        self.diagnostic_logger.info(
+                            f"Found {new_book_count} new suggestions that are not already in Readarr"
+                        )
 
                 if self.search_exhausted_flag and not self.stop_event.is_set():
-                    self.diagnostic_logger.info("Search Exhausted - Try selecting more books from existing Readarr library")
-                    socketio.emit("new_toast_msg", {"title": "Search Exhausted", "message": "Try selecting more books from existing Readarr library"})
+                    self.diagnostic_logger.info(
+                        "Search Exhausted - Try selecting more books from existing Readarr library"
+                    )
+                    socketio.emit(
+                        "new_toast_msg",
+                        {
+                            "title": "Search Exhausted",
+                            "message": "Try selecting more books from existing Readarr library",
+                        },
+                    )
 
-            except Exception as e:
-                self.diagnostic_logger.error(f"Failure Scraping Goodreads: {str(e)}")
-                socketio.emit("new_toast_msg", {"title": "Search Failed", "message": "Check Logs...."})
+            except Exception:
+                self.diagnostic_logger.exception("Failure Scraping Goodreads")
+                socketio.emit(
+                    "new_toast_msg",
+                    {"title": "Search Failed", "message": "Check Logs...."},
+                )
 
             finally:
                 self.search_in_progress_flag = False
@@ -274,12 +368,20 @@ class DataHandler:
         elif self.search_exhausted_flag:
             try:
                 self.search_in_progress_flag = True
-                self.diagnostic_logger.info("Search Exhausted - Try selecting more books from existing Readarr library")
-                socketio.emit("new_toast_msg", {"title": "Search Exhausted", "message": "Try selecting more books from existing Readarr library"})
+                self.diagnostic_logger.info(
+                    "Search Exhausted - Try selecting more books from existing Readarr library"
+                )
+                socketio.emit(
+                    "new_toast_msg",
+                    {
+                        "title": "Search Exhausted",
+                        "message": "Try selecting more books from existing Readarr library",
+                    },
+                )
                 self.stop_event.wait(2)
 
-            except Exception as e:
-                self.diagnostic_logger.error(f"Search Exhausted Error: {str(e)}")
+            except Exception:
+                self.diagnostic_logger.exception("Search Exhausted Error")
 
             finally:
                 self.search_in_progress_flag = False
@@ -294,15 +396,27 @@ class DataHandler:
             status = self._readarr_book_lookup(author_data, book_name)
 
             if status == "Success":
-                self.readarr_items.append({"name": book_author_and_title, "checked": False})
+                self.readarr_items.append(
+                    {"name": book_author_and_title, "checked": False}
+                )
                 cleaned_book = unidecode(book_author_and_title).lower()
                 self.cleaned_readarr_items.append(cleaned_book)
-                self.diagnostic_logger.info(f"Book: {book_author_and_title} successfully added to Readarr.")
+                self.diagnostic_logger.info(
+                    f"Book: {book_author_and_title} successfully added to Readarr."
+                )
                 status = "Added"
             else:
                 status = "Failed to Add"
-                self.diagnostic_logger.info(f"Failed to add to Readarr as no matching book for: {book_author_and_title}.")
-                socketio.emit("new_toast_msg", {"title": "Failed to add Book", "message": f"No Matching Book for: {book_author_and_title}"})
+                self.diagnostic_logger.info(
+                    f"Failed to add to Readarr as no matching book for: {book_author_and_title}."
+                )
+                socketio.emit(
+                    "new_toast_msg",
+                    {
+                        "title": "Failed to add Book",
+                        "message": f"No Matching Book for: {book_author_and_title}",
+                    },
+                )
 
             for item in self.recommended_books:
                 if item["Name"] == book_name and item["Author"] == author_name:
@@ -310,21 +424,30 @@ class DataHandler:
                     socketio.emit("refresh_book", item)
                     break
             else:
-                self.diagnostic_logger.info(f"{item['Author']} - {item['Name']} not found in Similar Book List")
+                self.diagnostic_logger.info(
+                    f"{item['Author']} - {item['Name']} not found in Similar Book List"
+                )
 
-        except Exception as e:
-            self.diagnostic_logger.error(f"Error Adding Book to Readarr: {str(e)}")
+        except Exception:
+            self.diagnostic_logger.exception("Error Adding Book to Readarr")
 
     def _readarr_book_lookup(self, author_data, book_name):
         try:
             time.sleep(self.readarr_wait_delay)
-            headers = {"Content-Type": "application/json", "X-Api-Key": self.readarr_api_key}
+            headers = {
+                "Content-Type": "application/json",
+                "X-Api-Key": self.readarr_api_key,
+            }
             readarr_book_url = f"{self.readarr_address}/api/v1/book"
             readarr_book_monitor_url = f"{self.readarr_address}/api/v1/book/monitor"
 
-            author_books_response = requests.get(f"{readarr_book_url}?authorId={author_data.get('id')}", headers=headers)
+            author_books_response = requests.get(
+                f"{readarr_book_url}?authorId={author_data.get('id')}", headers=headers
+            )
             if author_books_response.status_code != 200:
-                raise Exception(f"Failed to get books from author: {author_books_response.content.decode('utf-8')}")
+                raise Exception(
+                    f"Failed to get books from author: {author_books_response.content.decode('utf-8')}"
+                )
 
             # Find a match for the requested book
             author_books_data = author_books_response.json()
@@ -334,26 +457,37 @@ class DataHandler:
                     book_data = book_item
                     break
             else:
-                raise Exception(f"Book: {book_name} not found in Readarr under author: {author_data.get('authorName')}.")
+                raise Exception(
+                    f"Book: {book_name} not found in Readarr under author: {author_data.get('authorName')}."
+                )
 
             payload = {"bookIds": [book_data.get("id")], "monitored": True}
-            response = requests.put(readarr_book_monitor_url, headers=headers, json=payload)
+            response = requests.put(
+                readarr_book_monitor_url, headers=headers, json=payload
+            )
             if response.status_code == 202:
-                self.diagnostic_logger.info(f"Book: {book_name} monitoring status updated successfully.")
+                self.diagnostic_logger.info(
+                    f"Book: {book_name} monitoring status updated successfully."
+                )
                 return "Success"
             else:
-                self.diagnostic_logger.error(f"Failed to update monitoring status for Book: {book_name}. Error: {response.content.decode('utf-8')}")
+                self.diagnostic_logger.error(
+                    f"Failed to update monitoring status for Book: {book_name}. Error: {response.content.decode('utf-8')}"
+                )
                 return "Failure"
 
-        except Exception as e:
-            self.diagnostic_logger.error(f"Book not added Readarr: {str(e)}")
+        except Exception:
+            self.diagnostic_logger.exception("Book not added Readarr")
             return "Failure"
 
     def _readarr_author_lookup(self, author_name):
         readarr_author_lookup_url = f"{self.readarr_address}/api/v1/author/lookup"
         readarr_author_url = f"{self.readarr_address}/api/v1/author"
         params = {"term": author_name}
-        headers = {"Content-Type": "application/json", "X-Api-Key": self.readarr_api_key}
+        headers = {
+            "Content-Type": "application/json",
+            "X-Api-Key": self.readarr_api_key,
+        }
 
         # Check if the author exists in Readarr
         author_response = requests.get(readarr_author_url, headers=headers)
@@ -370,9 +504,13 @@ class DataHandler:
 
         if not author_data:
             # Search for Author
-            author_lookup = requests.get(readarr_author_lookup_url, params=params, headers=headers)
+            author_lookup = requests.get(
+                readarr_author_lookup_url, params=params, headers=headers
+            )
             if author_lookup.status_code != 200:
-                raise Exception(f"Readarr Lookup failed: {author_lookup.content.decode('utf-8')}")
+                raise Exception(
+                    f"Readarr Lookup failed: {author_lookup.content.decode('utf-8')}"
+                )
 
             search_results = author_lookup.json()
             for result in search_results:
@@ -389,7 +527,9 @@ class DataHandler:
                 "metadataProfileId": self.metadata_profile_id,
                 "qualityProfileId": self.quality_profile_id,
                 "rootFolderPath": self.root_folder_path,
-                "path": os.path.join(self.root_folder_path, author_data.get("authorName")),
+                "path": os.path.join(
+                    self.root_folder_path, author_data.get("authorName")
+                ),
                 "foreignAuthorId": author_data.get("foreignAuthorId"),
                 "monitored": True,
                 "monitorNewItems": "none",
@@ -399,10 +539,14 @@ class DataHandler:
                     "monitored": True,
                 },
             }
-            author_response = requests.post(readarr_author_url, headers=headers, json=author_payload)
+            author_response = requests.post(
+                readarr_author_url, headers=headers, json=author_payload
+            )
             author_data = author_response.json()
             if author_response.status_code != 201:
-                raise Exception(f"Failed to add author: {author_response.content.decode('utf-8')}")
+                raise Exception(
+                    f"Failed to add author: {author_response.content.decode('utf-8')}"
+                )
 
         return author_data
 
@@ -415,8 +559,8 @@ class DataHandler:
                 "google_books_api_key": self.google_books_api_key,
             }
             socketio.emit("settings_loaded", data)
-        except Exception as e:
-            self.diagnostic_logger.error(f"Failed to load settings: {str(e)}")
+        except Exception:
+            self.diagnostic_logger.exception("Failed to load settings")
 
     def update_settings(self, data):
         try:
@@ -424,8 +568,8 @@ class DataHandler:
             self.readarr_api_key = data["readarr_api_key"]
             self.root_folder_path = data["root_folder_path"]
             self.google_books_api_key = data["google_books_api_key"]
-        except Exception as e:
-            self.diagnostic_logger.error(f"Failed to update settings: {str(e)}")
+        except Exception:
+            self.diagnostic_logger.exception("Failed to update settings")
 
     def save_config_to_file(self):
         try:
@@ -452,8 +596,8 @@ class DataHandler:
                     indent=4,
                 )
 
-        except Exception as e:
-            self.diagnostic_logger.error(f"Error Saving Config: {str(e)}")
+        except Exception:
+            self.diagnostic_logger.exception("Error Saving Config")
 
     def query_google_books(self, book):
         try:
@@ -474,8 +618,10 @@ class DataHandler:
                     if match_ratio > 90 or query in book_string:
                         break
 
-        except Exception as e:
-            self.diagnostic_logger.error(f"Error retrieving book Data from Google Books API: {str(e)}")
+        except Exception:
+            self.diagnostic_logger.exception(
+                "Error retrieving book Data from Google Books API"
+            )
 
         finally:
             return book_info
@@ -487,8 +633,8 @@ class DataHandler:
             book["Published_Date"] = book_info.get("publishedDate")
             book["Page_Count"] = book_info.get("pageCount")
 
-        except Exception as e:
-            self.diagnostic_logger.error(f"Error retrieving book overview: {str(e)}")
+        except Exception:
+            self.diagnostic_logger.exception("Error retrieving book overview")
 
         finally:
             socketio.emit("overview", book, room=request.sid)
@@ -508,20 +654,28 @@ def home():
 @socketio.on("side_bar_opened")
 def side_bar_opened():
     if data_handler.readarr_items:
-        ret = {"Status": "Success", "Data": data_handler.readarr_items, "Running": not data_handler.stop_event.is_set()}
+        ret = {
+            "Status": "Success",
+            "Data": data_handler.readarr_items,
+            "Running": not data_handler.stop_event.is_set(),
+        }
         socketio.emit("readarr_sidebar_update", ret)
 
 
 @socketio.on("get_readarr_books")
 def get_readarr_books():
-    thread = threading.Thread(target=data_handler.request_books_from_readarr, name="Readarr_Thread")
+    thread = threading.Thread(
+        target=data_handler.request_books_from_readarr, name="Readarr_Thread"
+    )
     thread.daemon = True
     thread.start()
 
 
 @socketio.on("adder")
 def add_to_readarr(book):
-    thread = threading.Thread(target=data_handler.add_to_readarr, args=(book,), name="Add_Book_Thread")
+    thread = threading.Thread(
+        target=data_handler.add_to_readarr, args=(book,), name="Add_Book_Thread"
+    )
     thread.daemon = True
     thread.start()
 
@@ -561,7 +715,9 @@ def stopper():
 
 @socketio.on("load_more_books")
 def load_more_books():
-    thread = threading.Thread(target=data_handler.find_similar_books, name="Find_Similar")
+    thread = threading.Thread(
+        target=data_handler.find_similar_books, name="Find_Similar",
+    )
     thread.daemon = True
     thread.start()
 
