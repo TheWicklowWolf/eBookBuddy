@@ -15,6 +15,7 @@ from webdriver_manager.firefox import GeckoDriverManager
 
 class Goodreads_Scraper:
     def __init__(self, logger, stop_event, minimum_rating, minimum_votes, goodreads_wait_delay):
+
         self.diagnostic_logger = logger
         self.stop_event = stop_event
         self.minimum_rating = minimum_rating
@@ -28,7 +29,7 @@ class Goodreads_Scraper:
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36 Edg/111.0.1661.62",
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36",
         ]
-        os.environ["WDM_LOCAL"] = "1"
+
         self.firexfox_options = webdriver.FirefoxOptions()
         self.firexfox_options.add_argument("--no-sandbox")
         self.firexfox_options.add_argument("--disable-dev-shm-usage")
