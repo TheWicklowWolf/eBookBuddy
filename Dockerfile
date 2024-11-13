@@ -1,32 +1,31 @@
-
 FROM python:3.12-alpine
 
 # Set build arguments
 ARG RELEASE_VERSION
 ENV RELEASE_VERSION=${RELEASE_VERSION}
 
-# Create User
-ARG UID=1000
-ARG GID=1000
-RUN addgroup -g $GID general_user && \
-    adduser -D -u $UID -G general_user -s /bin/sh general_user
-
-# Create directories and set permissions
-COPY . /ebookbuddy
-WORKDIR /ebookbuddy
-RUN chown -R $UID:$GID /ebookbuddy
-
-# Install Firefox and Xvfb
+# Install Firefox, Xvfb and su-exec
 RUN apk --no-cache add \
     firefox \
     xvfb \ 
     ttf-freefont \
     fontconfig \
-    dbus
+    dbus \
+    su-exec    
 
-# Install requirements and run code
+# Create directories and set permissions
+COPY . /ebookbuddy
+WORKDIR /ebookbuddy
+
+# Install requirements
 RUN pip install --no-cache-dir -r requirements.txt
 ENV PYTHONPATH "${PYTHONPATH}:/ebookbuddy/src"
+
+# Make the script executable
+RUN chmod +x thewicklowwolf-init.sh
+
+# Expose port
 EXPOSE 5000
-USER general_user
-CMD ["gunicorn", "src.eBookBuddy:app", "-c", "gunicorn_config.py"]
+
+# Start the app
+ENTRYPOINT ["./thewicklowwolf-init.sh"]
