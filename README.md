@@ -17,7 +17,7 @@ services:
     image: thewicklowwolf/ebookbuddy:latest
     container_name: ebookbuddy
     volumes:
-      - /path/to/config:/ebookbuddy/config
+      - /path/to/config:/ebookbuddy/config # Optional
       - /etc/localtime:/etc/localtime:ro
     ports:
       - 5000:5000
