@@ -1,3 +1,4 @@
+import os
 import random
 import platform
 from urllib.parse import urlparse
@@ -27,6 +28,7 @@ class Goodreads_Scraper:
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36 Edg/111.0.1661.62",
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36",
         ]
+        os.environ["WDM_LOCAL"] = "1"
         self.firexfox_options = webdriver.FirefoxOptions()
         self.firexfox_options.add_argument("--no-sandbox")
         self.firexfox_options.add_argument("--disable-dev-shm-usage")

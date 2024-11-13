@@ -19,7 +19,10 @@ WORKDIR /ebookbuddy
 
 # Install requirements
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Set Environmental Variables
 ENV PYTHONPATH "${PYTHONPATH}:/ebookbuddy/src"
+ENV WDM_LOCAL="1"
 
 # Make the script executable
 RUN chmod +x thewicklowwolf-init.sh

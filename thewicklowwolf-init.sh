@@ -39,7 +39,7 @@ echo "-----------------"
 
 # Create the required directories with the correct permissions
 echo "Setting up directories.."
-mkdir -p /ebookbuddy/config
+mkdir -p /ebookbuddy/config /ebookbuddy/.wdm
 chown -R ${PUID}:${PGID} /ebookbuddy
 
 # Start the application with the specified user permissions
