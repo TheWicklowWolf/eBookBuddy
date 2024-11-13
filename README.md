@@ -17,7 +17,7 @@ services:
     image: thewicklowwolf/ebookbuddy:latest
     container_name: ebookbuddy
     volumes:
-      - /path/to/config:/ebookbuddy/config
+      - /path/to/config:/ebookbuddy/config # Optional
       - /etc/localtime:/etc/localtime:ro
     ports:
       - 5000:5000
@@ -28,8 +28,6 @@ services:
 
 Certain values can be set via environment variables:
 
-* __PUID__: The user ID to run the app with. Defaults to `1000`. 
-* __PGID__: The group ID to run the app with. Defaults to `1000`.
 * __readarr_address__: The URL for Readarr. Defaults to `http://192.168.1.2:8787`.
 * __readarr_api_key__: The API key for Readarr. Defaults to ``.
 * __root_folder_path__: The root folder path for Books. Defaults to `/data/media/books/`.
