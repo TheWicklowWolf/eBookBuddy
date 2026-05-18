@@ -7,5 +7,5 @@ requests==2.33.1
 thefuzz==0.22.1
 Unidecode==1.4.0
 selenium==4.40.0
-webdriver-manager==4.0.2
+webdriver-manager==4.1.1
 PyVirtualDisplay==3.0
